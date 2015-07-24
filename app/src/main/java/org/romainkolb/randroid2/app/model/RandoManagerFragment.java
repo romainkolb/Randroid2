@@ -18,10 +18,14 @@ import com.google.android.gms.maps.model.LatLng;
 import org.romainkolb.randroid2.app.R;
 import org.romainkolb.randroid2.app.data.RandoDbHelper;
 import org.romainkolb.randroid2.app.data.Utils;
-import retrofit.Callback;
+import org.romainkolb.randroid2.app.observables.GeoCodePauseObservable;
 import retrofit.RestAdapter;
 import retrofit.RetrofitError;
-import retrofit.client.Response;
+import rx.Observable;
+import rx.android.schedulers.AndroidSchedulers;
+import rx.functions.Action1;
+import rx.functions.Func1;
+import rx.schedulers.Schedulers;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -35,10 +39,6 @@ public class RandoManagerFragment extends ContractFragment<RandoManagerFragment.
     private RollersCoquillagesService rc;
     private RandoDbHelper db;
 
-    private final RandoGetter randoGetter = new RandoGetter();
-    private final RandoInitializer randoInitializer = new RandoInitializer();
-
-    private static Geocoder geocoder;
     private SharedPreferences prefs;
 
     @Override
@@ -54,19 +54,50 @@ public class RandoManagerFragment extends ContractFragment<RandoManagerFragment.
 
         db = new RandoDbHelper(getActivity().getApplicationContext());
 
-        geocoder = new Geocoder(getActivity());
-
         prefs = PreferenceManager.getDefaultSharedPreferences(getActivity().getApplicationContext());
         prefs.getAll();
 
         return null;
     }
 
-    public void getRandoFromWs(Calendar date) {
+    public void getRandoFromWsRx(Calendar date) {
         Integer nbPos = getNbPositions();
-        String textDate = DateFormat.format("yyyyMMdd", date).toString();
-        rc.getRando(textDate, nbPos, randoGetter);
+        getRandoFromWsRx(date, nbPos);
     }
+
+    public void getRandoFromWsRx(Calendar date, Integer nbPos) {
+        String textDate = date == null ? "" : DateFormat.format("yyyyMMdd", date).toString();
+
+        rc.getRandoRx(textDate, nbPos)
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .onErrorReturn(new Func1<Throwable, Rando>() {
+                    @Override
+                    public Rando call(Throwable throwable) {
+                        if (throwable instanceof RetrofitError) {
+                            processRetrofitError((RetrofitError) throwable);
+                        }else{
+                            Log.e(rc.getClass().getSimpleName(),"Remote error",throwable);
+                        }
+                        return null;
+                    }
+                })
+                .flatMap(new Func1<Rando, Observable<Rando>>() {
+                    @Override
+                    public Observable<Rando> call(Rando rando) {
+                        return GeoCodePauseObservable.createObservable(getActivity(), rando);
+                    }
+                })
+                .subscribe(new Action1<Rando>() {
+                    @Override
+                    public void call(Rando rando) {
+                        if (rando != null) {
+                            getContract().drawRando(rando);
+                        }
+                    }
+                });
+    }
+
 
     public void getRandoFromDb(Calendar date) {
         db.getRandoAsync(date, this);
@@ -82,7 +113,7 @@ public class RandoManagerFragment extends ContractFragment<RandoManagerFragment.
     }
 
     private void saveRando(Rando rando) {
-        List<Rando> randos = new ArrayList<Rando>(1);
+        List<Rando> randos = new ArrayList<>(1);
         randos.add(rando);
         saveRandos(randos);
     }
@@ -98,7 +129,7 @@ public class RandoManagerFragment extends ContractFragment<RandoManagerFragment.
                 getContract().drawRando(rando);
             } else {
                 //We haven't downloaded this rando yet, let's do it
-                getRandoFromWs(rando.getDate());
+                getRandoFromWsRx(rando.getDate());
             }
         }
     }
@@ -106,7 +137,7 @@ public class RandoManagerFragment extends ContractFragment<RandoManagerFragment.
     @Override
     public void resetComplete() {
         //Initialize DB with most recent Rando
-        rc.getRando("", 0, randoInitializer);
+        getRandoFromWsRx(null);
     }
 
     @Override
@@ -130,96 +161,10 @@ public class RandoManagerFragment extends ContractFragment<RandoManagerFragment.
         void cancelProgress();
     }
 
-    private class RandoGetter implements Callback<Rando> {
-        @Override
-        public void success(Rando rando, Response response) {
-            RandoProcessor randoProcessor = new RandoGetterProcessor();
-            Utils.executeAsyncTask(new GeocodeAsync(randoProcessor), rando);
-        }
-
-        @Override
-        public void failure(RetrofitError retrofitError) {
-            Log.e(((Object) this).getClass().getSimpleName(), "Exception from Retrofit request to Roller&Coquillages", retrofitError);
-            processRetrofitError(retrofitError);
-        }
-    }
-
-    private class RandoInitializer implements Callback<Rando> {
-
-        @Override
-        public void success(Rando rando, Response response) {
-            RandoProcessor randoProcessor = new RandoInitializerProcessor();
-            Utils.executeAsyncTask(new GeocodeAsync(randoProcessor), rando);
-        }
-
-        @Override
-        public void failure(RetrofitError retrofitError) {
-            Log.e(((Object) this).getClass().getSimpleName(), "Exception from Retrofit request to Roller&Coquillages", retrofitError);
-            processRetrofitError(retrofitError);
-        }
-    }
-
-    private interface RandoProcessor {
-        void processRando(Rando rando);
-    }
-
-    private class RandoGetterProcessor implements RandoProcessor {
-        @Override
-        public void processRando(Rando rando) {
-            saveRando(rando);
-            getContract().drawRando(rando);
-        }
-    }
-
-    private class RandoInitializerProcessor implements RandoProcessor {
-        @Override
-        public void processRando(Rando rando) {
-            //We decrement nb randos because we already have downloaded one Rando
-            List<Rando> randos = Utils.getPreviousRandos(rando.getDate(), getNbRandos()-1);
-            randos.add(0, rando);
-            saveRandos(randos);
-            getContract().drawRando(rando);
-        }
-    }
-
-
-    private class GeocodeAsync extends AsyncTask<Rando, Void, Rando> {
-        private RandoProcessor randoProcessor;
-
-        GeocodeAsync(RandoProcessor randoProcessor) {
-            this.randoProcessor = randoProcessor;
-        }
-
-        @Override
-        protected Rando doInBackground(Rando... params) {
-            Rando rando = params[0];
-
-            if (rando != null && rando.getRetour() != null && rando.getRetour().size() > 0) {
-                LatLng pause = rando.getRetour().get(0);
-                try {
-                    List<Address> pauseAddress = geocoder.getFromLocation(pause.latitude, pause.longitude, 1);
-                    if (pauseAddress != null && pauseAddress.size() > 0) {
-                        String thoroughfare = pauseAddress.get(0).getThoroughfare();
-                        rando.setPauseThoroughfare(thoroughfare);
-                    }
-                } catch (IOException e) {
-                    Log.e(this.getClass().getSimpleName(), "error while geocoding pause address", e);
-                }
-            }
-
-
-            return rando;
-        }
-
-        @Override
-        public void onPostExecute(Rando rando) {
-            randoProcessor.processRando(rando);
-        }
-    }
 
     public int getNbRandos() {
         int def = getResources().getInteger(R.integer.defaultNbRandos);
-        return  Integer.parseInt(prefs.getString(getString(R.string.prefKeyNbRandos), String.valueOf(def)));
+        return Integer.parseInt(prefs.getString(getString(R.string.prefKeyNbRandos), String.valueOf(def)));
     }
 
     public int getNbPositions() {
@@ -233,21 +178,21 @@ public class RandoManagerFragment extends ContractFragment<RandoManagerFragment.
         return prefs.getBoolean(getString(R.string.prefKeyRefreshOnStartup), def);
     }
 
-    public boolean isDisplayGPSOverlay(){
+    public boolean isDisplayGPSOverlay() {
         boolean def = getResources().getBoolean(R.bool.defaultGPSOverlay);
-        return prefs.getBoolean(getString(R.string.prefKeyGPSOverlay),def);
+        return prefs.getBoolean(getString(R.string.prefKeyGPSOverlay), def);
     }
 
 
-    private void processRetrofitError(RetrofitError retrofitError){
-        if(retrofitError != null){
+    private void processRetrofitError(RetrofitError retrofitError) {
+        if (retrofitError != null) {
             String errorMessage;
-        if(retrofitError.getKind() == RetrofitError.Kind.NETWORK){
-            errorMessage = getResources().getString(R.string.network_error);
-        }else{
-            errorMessage = String.format(getResources().getString(R.string.read_error),retrofitError.getLocalizedMessage());
-        }
-             Toast.makeText(getActivity(),errorMessage,Toast.LENGTH_SHORT).show();
+            if (retrofitError.getKind() == RetrofitError.Kind.NETWORK) {
+                errorMessage = getResources().getString(R.string.network_error);
+            } else {
+                errorMessage = String.format(getResources().getString(R.string.read_error), retrofitError.getLocalizedMessage());
+            }
+            Toast.makeText(getActivity(), errorMessage, Toast.LENGTH_SHORT).show();
         }
 
         getContract().cancelProgress();

@@ -143,7 +143,8 @@ public class MainActivity extends AppCompatActivity
         Rando rando = mRandoMapFragment.getCurrentRando();
         if (rando != null) {
             //toggleRefresh(true);
-            getRandoManagerFragment().getRandoFromWs(rando.getDate());
+            //getRandoManagerFragment().getRandoFromWs(rando.getDate());
+            getRandoManagerFragment().getRandoFromWsRx(rando.getDate());
         }
     }
 
