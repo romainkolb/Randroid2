@@ -5,4 +5,7 @@
 
     <item name="nomades_lat" type="dimen" format="float">48.852175</item>
     <item name="nomades_lng" type="dimen" format="float">2.367853</item>
+
+    <!-- padding added to map camera position when centering on a newly drawn rando -->
+    <item name="camera_position_padding" type="dimen" format="float">0.005</item>
 </resources>

@@ -41,6 +41,12 @@ public class RandoMapFragment extends SupportMapFragment {
     private double maxLon;
     private double minLon;
 
+    private float cameraPadding;
+
+    private static final String CAMERA_POSITION="cameraposition";
+    private CameraPosition camPosition;
+    private boolean restoringExistingMap=false;
+
     public RandoMapFragment() {
         // Required empty public constructor
     }
@@ -54,7 +60,15 @@ public class RandoMapFragment extends SupportMapFragment {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        setRetainInstance(true);
+        TypedValue tv = new TypedValue();
+
+        getResources().getValue(R.dimen.camera_position_padding, tv, true);
+        cameraPadding = tv.getFloat();
+
+        if(savedInstanceState != null){
+            camPosition = (CameraPosition) savedInstanceState.get(CAMERA_POSITION);
+            restoringExistingMap = true;
+        }
     }
 
     @Override
@@ -69,7 +83,16 @@ public class RandoMapFragment extends SupportMapFragment {
         super.onPause();
     }
 
+    @Override
+    public void onSaveInstanceState(Bundle savedInstanceState) {
+        if(mMap != null) {
+            //Recreating existing Map, we'll need the saved CameraPosition for when the map is ready
+            savedInstanceState.putParcelable(CAMERA_POSITION, mMap.getCameraPosition());
 
+        }
+
+        super.onSaveInstanceState(savedInstanceState);
+    }
 
     /**
      * Sets up the map if it is possible to do so (i.e., the Google Play services APK is correctly
@@ -119,12 +142,16 @@ public class RandoMapFragment extends SupportMapFragment {
             initCoords();
         }
 
-        // Move the camera instantly to Paris with a zoom of 5.
-        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(paris, 5));
+        if(camPosition != null) {
+            //Recreating existing Map, let's restore the camera
+            mMap.moveCamera(CameraUpdateFactory.newCameraPosition(camPosition));
+        }else{
+            // Move the camera instantly to Paris with a zoom of 5.
+            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(paris, 5));
 
-        // Zoom in, animating the camera.
-        mMap.animateCamera(CameraUpdateFactory.zoomTo(11), 2000, null);
-
+            // Zoom in, animating the camera.
+            mMap.animateCamera(CameraUpdateFactory.zoomTo(11), 2000, null);
+        }
     }
 
     public void drawRando(Rando rando) {
@@ -161,11 +188,16 @@ public class RandoMapFragment extends SupportMapFragment {
             randoLocation = mMap.addMarker(new MarkerOptions().position(rando.getLastRandoPosition()).icon(BitmapDescriptorFactory.fromResource(R.drawable.poi_rando_position)).title(getString(R.string.randoLocation)));
         }
 
-        //Zoom to rando
-        LatLng maxBound = new LatLng(maxLat + 0.005, maxLon + 0.005);
-        LatLng minBound = new LatLng(minLat - 0.005, minLon - 0.005);
-        LatLngBounds randoBounds = LatLngBounds.builder().include(maxBound).include(minBound).build();
-        mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(randoBounds, 0));
+        if(restoringExistingMap){
+            //restoring existing map, so we stay at the restored CameraPosition
+            restoringExistingMap = false;
+        }else {
+            //Zoom to rando
+            LatLng maxBound = new LatLng(maxLat + cameraPadding, maxLon + cameraPadding);
+            LatLng minBound = new LatLng(minLat - cameraPadding, minLon - cameraPadding);
+            LatLngBounds randoBounds = LatLngBounds.builder().include(maxBound).include(minBound).build();
+            mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(randoBounds, 0));
+        }
     }
 
     private Polyline drawSegment(List<LatLng> segment, int color) {

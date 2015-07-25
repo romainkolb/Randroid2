@@ -2,9 +2,6 @@ package org.romainkolb.randroid2.app.model;
 
 import android.content.SharedPreferences;
 import android.database.Cursor;
-import android.location.Address;
-import android.location.Geocoder;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.text.format.DateFormat;
@@ -14,10 +11,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Toast;
 import com.commonsware.android.retrofit.ContractFragment;
-import com.google.android.gms.maps.model.LatLng;
 import org.romainkolb.randroid2.app.R;
 import org.romainkolb.randroid2.app.data.RandoDbHelper;
-import org.romainkolb.randroid2.app.data.Utils;
 import org.romainkolb.randroid2.app.observables.GeoCodePauseObservable;
 import retrofit.RestAdapter;
 import retrofit.RetrofitError;
@@ -27,7 +22,6 @@ import rx.functions.Action1;
 import rx.functions.Func1;
 import rx.schedulers.Schedulers;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
@@ -137,7 +131,14 @@ public class RandoManagerFragment extends ContractFragment<RandoManagerFragment.
     @Override
     public void resetComplete() {
         //Initialize DB with most recent Rando
-        getRandoFromWsRx(null);
+        //getRandoFromWsRx(null);
+
+        //TEMP : get known good rando
+        Calendar cal = Calendar.getInstance();
+        cal.set(Calendar.YEAR,2015);
+        cal.set(Calendar.MONTH,Calendar.JULY);
+        cal.set(Calendar.DAY_OF_MONTH,19);
+        getRandoFromWsRx(cal);
     }
 
     @Override
