@@ -168,8 +168,8 @@ public class RandoMapFragment extends SupportMapFragment {
         minLon = Double.MAX_VALUE;
         maxLon = Double.MIN_VALUE;
 
-        currentAller = drawSegment(rando.getAller(), 0xff67c547);
-        currentRetour = drawSegment(rando.getRetour(), 0xffc03639);
+        currentAller = drawSegment(rando.getAller(), getResources().getColor(R.color.aller));
+        currentRetour = drawSegment(rando.getRetour(), getResources().getColor(R.color.retour));
 
         //Draw POIs
         if (currentAller != null && currentAller.getPoints().size() > 0) {

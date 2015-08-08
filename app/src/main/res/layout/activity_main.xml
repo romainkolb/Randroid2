@@ -13,7 +13,7 @@
               android:layout_width="match_parent"
               android:layout_height="match_parent"
               android:name="org.romainkolb.randroid2.app.RandoMapFragment"
-              />
+              tools:layout="@layout/abc_screen_simple"/>
 
     <!-- android:layout_gravity="start" tells DrawerLayout to treat
          this as a sliding drawer on the left side for left-to-right
@@ -26,6 +26,6 @@
               android:layout_width="@dimen/navigation_drawer_width"
               android:layout_height="match_parent"
               android:layout_gravity="start"
-              android:name="org.romainkolb.randroid2.app.NavigationDrawerFragment"
+              android:name="org.romainkolb.randroid2.app.navigationdrawer.NavigationDrawerFragment"
               tools:layout="@layout/fragment_navigation_drawer"/>
 </android.support.v4.widget.DrawerLayout>

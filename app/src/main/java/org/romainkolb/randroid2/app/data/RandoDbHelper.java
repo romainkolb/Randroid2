@@ -252,7 +252,7 @@ public class RandoDbHelper extends SQLiteOpenHelper {
                             position++;
                         }
                     }
-
+                    c.close();
                 }
                 db.setTransactionSuccessful();
             } catch (Exception e) {

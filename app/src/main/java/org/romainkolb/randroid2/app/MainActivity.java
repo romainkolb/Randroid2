@@ -11,6 +11,7 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import org.romainkolb.randroid2.app.model.Rando;
 import org.romainkolb.randroid2.app.model.RandoManagerFragment;
+import org.romainkolb.randroid2.app.navigationdrawer.NavigationDrawerFragment;
 
 
 public class MainActivity extends AppCompatActivity
